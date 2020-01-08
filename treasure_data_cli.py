@@ -25,9 +25,11 @@ color = {
 @click.option('-e', '--engine', default='presto', type=click.Choice(['hive', 'presto']), help='query engine to be used')
 @click.option('-l', '--limit', type=click.INT, help='limit the number of rows to be returned')
 @click.option('-k', '--key', envvar="TD_API_KEY", help='provide TreasureData API key')
-def entry_point(db_name, table_name, column, format, min, max, engine, limit, key):
-    global td_api_key
+@click.option('-k', '--endpoint', default='https://api.treasuredata.com', envvar="TD_API_SERVER", help='provide TreasureData API endpoint')
+def entry_point(db_name, table_name, column, format, min, max, engine, limit, key, endpoint):
+    global td_api_key, td_api_endpoint
     td_api_key = key
+    td_api_endpoint = endpoint
     check_if_database_exists(db_name)
     check_if_table_exists(db_name, table_name)
     run_query(db_name, table_name, column, min, max, limit, format, engine)
@@ -35,7 +37,7 @@ def entry_point(db_name, table_name, column, format, min, max, engine, limit, ke
 
 def check_if_database_exists(db_name):
     try:
-        api_obj = api.API(td_api_key)
+        api_obj = api.API(td_api_key, endpoint=td_api_endpoint)
         db_list = list(api_obj.list_databases().keys())
     except ValueError as ve:
         raise click.ClickException("%sProvide a valid API key%s" % (color.get('RED', ''), color.get('END', '')))
@@ -49,7 +51,7 @@ def check_if_database_exists(db_name):
 
 def check_if_table_exists(db_name, table_name):
     try:
-        api_obj = api.API(td_api_key)
+        api_obj = api.API(td_api_key, endpoint=td_api_endpoint)
         tables_list = list(api_obj.list_tables(db_name).keys())
     except Exception as e:
         raise click.ClickException("%s%s%s" % (color.get('RED', ''), e, color.get('END', '')))
@@ -60,7 +62,7 @@ def check_if_table_exists(db_name, table_name):
 def run_query(db_name, table_name, column, min, max, limit, format, engine):
     query = construct_query(table_name, column, min, max, limit)
     try:
-        td = client.Client(td_api_key)
+        td = client.Client(td_api_key, endpoint=td_api_endpoint)
         out = td.query(db_name, query, type=engine)
         click.echo("Running query: %s %s %s" % (color.get('BOLD', ''), out.query, color.get('END', '')))
         while not out.finished():
